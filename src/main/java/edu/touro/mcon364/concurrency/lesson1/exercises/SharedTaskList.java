@@ -4,6 +4,7 @@ import edu.touro.mcon364.concurrency.common.model.Task;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Collections;
 
 /**
  * Exercise 4: Fixing a shared ArrayList race condition
@@ -27,8 +28,7 @@ import java.util.List;
  */
 public class SharedTaskList {
 
-    // TODO: replace this unsafe list with a thread-safe one
-    private final List<Task> tasks = new ArrayList<>();
+    private final List<Task> tasks = Collections.synchronizedList(new ArrayList<>());
 
     /** Adds a task to the shared list. */
     public void add(Task task) {
