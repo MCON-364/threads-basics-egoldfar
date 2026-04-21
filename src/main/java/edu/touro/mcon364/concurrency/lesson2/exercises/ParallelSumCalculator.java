@@ -1,6 +1,7 @@
 package edu.touro.mcon364.concurrency.lesson2.exercises;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.*;
 
@@ -40,22 +41,57 @@ public class ParallelSumCalculator {
     public long parallelSum(List<Integer> numbers, int workers)
             throws InterruptedException, ExecutionException {
 
-        // TODO: create a thread pool with the right number of workers
+        // create a thread pool with the right number of workers
+        ExecutorService pool = Executors.newFixedThreadPool(workers);
 
-        // TODO: divide numbers into roughly equal slices — one slice per worker
+        //  divide numbers into roughly equal slices — one slice per worker
         //       Think: how do you calculate the slice size without losing
         //       the last few elements when the list doesn't divide evenly?
 
-        // TODO: submit each slice as a task that returns its partial sum.
+        int sliceSize;
+        if (workers > numbers.size()) {
+            sliceSize = 0;
+        } else if (numbers.size() % workers != 0) {
+            sliceSize = numbers.size() / workers - 1;
+        } else {
+            sliceSize = numbers.size() / workers;
+        }
+
+        ArrayList<List<Integer>> slices = new  ArrayList<>();
+        int index = 0;
+        for (int i = 0; i < workers -1; i++) {
+            slices.add(numbers.subList(index, index+ sliceSize));
+            index += sliceSize;
+        }
+        slices.add(numbers.subList(index, numbers.size()));
+
+        // submit each slice as a task that returns its partial sum.
         //       Collect the handles to the results — but do NOT ask for the
         //       answers yet, so that all slices run at the same time.
+
         List<Future<Long>> futures = new ArrayList<>();
 
-        // TODO: now that all slices are running, collect each partial sum
+        for (List<Integer> slice : slices) {
+
+            Callable<Long> callable = () -> {
+                int sum = 0;
+                for (int i: slice) {
+                    sum += i;
+                }
+                return (long) sum;
+            };
+            futures.add(pool.submit(callable));
+        }
+
+        // now that all slices are running, collect each partial sum
         //       and add it to the total
         long total = 0;
+        for (Future<Long> future : futures) {
+            total += future.get();
+        }
 
-        // TODO: release pool resources before returning
+        // release pool resources before returning
+        pool.shutdown();
         return total;
     }
 }

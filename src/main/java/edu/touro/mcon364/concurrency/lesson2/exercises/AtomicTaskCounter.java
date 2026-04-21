@@ -22,32 +22,32 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class AtomicTaskCounter {
 
-    // TODO: declare the field that will hold the counter value thread-safely
+    //declare the field that will hold the counter value thread-safely
+    private final AtomicInteger safeCount = new AtomicInteger(0);
 
     /**
      * Atomically increments the counter by one.
-     * TODO: update the counter without using synchronized
+     * update the counter without using synchronized
      */
     public void increment() {
-        // TODO: implement
+        safeCount.incrementAndGet();
     }
 
     /**
      * Atomically decrements the counter by one.
-     * TODO: update the counter without using synchronized
+     * update the counter without using synchronized
      */
     public void decrement() {
-        // TODO: implement
+        safeCount.decrementAndGet();
     }
 
     /** Returns the current counter value. */
     public int getCount() {
-        // TODO: implement
-        return 0;
+        return safeCount.intValue();
     }
 
     /** Resets the counter to zero. */
     public void reset() {
-        // TODO: implement
+        safeCount.set(0);
     }
 }
