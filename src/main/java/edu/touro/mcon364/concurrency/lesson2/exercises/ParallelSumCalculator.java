@@ -92,6 +92,7 @@ public class ParallelSumCalculator {
 
         // release pool resources before returning
         pool.shutdown();
+        pool.awaitTermination(30, TimeUnit.SECONDS);
         return total;
     }
 }

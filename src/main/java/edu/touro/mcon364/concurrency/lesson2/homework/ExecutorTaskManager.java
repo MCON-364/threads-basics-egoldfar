@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Homework — Executor-backed task manager with atomic IDs.
@@ -53,30 +54,37 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class ExecutorTaskManager {
 
     /* ── SYNCHRONIZER CHOICE ────────────────────────────────────────────────
-     * TODO: In 1–3 sentences, explain which synchronizer you would add to
+     * In 1–3 sentences, explain which synchronizer you would add to
      *       wait for a complete batch before the next batch starts, and why.
+     * Cyclical Barrier - they all must complete phase 1
+     *  before any may start phase 2.  The barrier resets automatically.
      * ──────────────────────────────────────────────────────────────────────*/
 
     private static final int POOL_SIZE = 4;
 
-    // TODO: declare the thread pool — what factory method gives you a fixed-size pool?
+    // declare the thread pool — what factory method gives you a fixed-size pool?
 
-    // TODO: declare the ID counter — what type guarantees uniqueness without synchronized?
+    ExecutorService pool =  Executors.newFixedThreadPool(POOL_SIZE);
+
+
+    // declare the ID counter — what type guarantees uniqueness without synchronized?
+
+    AtomicInteger idCounter = new AtomicInteger(0);
 
     // List of tasks that have finished — written by worker threads, so needs protection
     private final List<Task> completedTasks = new ArrayList<>();
 
-    // TODO: declare the lock that will protect completedTasks
+    // declare the lock that will protect completedTasks
+    private final ReentrantLock completedTasksLock = new ReentrantLock();
 
     // ── ID generation ────────────────────────────────────────────────────────
 
     /**
      * Returns a unique, auto-incremented task ID.
-     * TODO: generate the next ID atomically — no synchronized keyword allowed
+     * generate the next ID atomically — no synchronized keyword allowed
      */
     public int nextId() {
-        // TODO: implement
-        return 0;
+        return idCounter.incrementAndGet();
     }
 
     // ── task submission ──────────────────────────────────────────────────────
@@ -88,14 +96,22 @@ public class ExecutorTaskManager {
      * @param priority    task priority
      * @return a {@link Future<Task>} that will hold the completed task
      */
-    public Future<Task> submit(String description, Priority priority) {
-        // TODO: obtain a unique ID for this task
+    public Future<Task> submit(String description, Priority priority){
+        // obtain a unique ID for this task
+        int id = nextId();
 
-        // TODO: build the Task record
+        // build the Task record
+        Task task = new Task(id, description, priority);
 
-        // TODO: hand the task to the pool as a Callable that processes it and
+        // hand the task to the pool as a Callable that processes it and
         //       returns it when done — return the Future the pool gives you back
-        return null;
+
+        Callable<Task> callable = () -> {
+                Thread.sleep(10);
+                recordCompleted(task);
+                return task;
+        };
+        return pool.submit(callable);
     }
 
     // ── recording completion ─────────────────────────────────────────────────
@@ -104,11 +120,18 @@ public class ExecutorTaskManager {
      * Records a finished task.
      *
      * This method is called from worker threads concurrently.
-     * TODO: protect the list so that two threads cannot corrupt it at the same time.
+     *  protect the list so that two threads cannot corrupt it at the same time.
      *       Add a comment explaining exactly why a lock is necessary here.
+     *       ArrayLists do not have thread safety built in some elements could get lost under race conditions
      */
     private void recordCompleted(Task task) {
-        // TODO: implement
+        completedTasksLock.lock();
+        try {
+            completedTasks.add(task);
+
+        } finally {
+            completedTasksLock.unlock();
+        }
     }
 
     // ── collecting results ───────────────────────────────────────────────────
@@ -117,12 +140,21 @@ public class ExecutorTaskManager {
      * Waits for every future in {@code futures} to complete and returns the
      * resulting {@link Task} objects in submission order.
      *
-     * TODO: retrieve each result in order and collect them into a list.
+     * retrieve each result in order and collect them into a list.
      *       What should happen if a task threw an exception or was interrupted?
+     *       I don't know what was wanted but I added a null value
      */
     public List<Task> awaitAll(List<Future<Task>> futures) {
-        // TODO: implement
-        return new ArrayList<>();
+        List<Task> tasks = new ArrayList<>();
+        for (Future<Task> future : futures) {
+            try {
+                Task task = future.get();
+                tasks.add(task);
+            } catch (InterruptedException | ExecutionException e) {
+                tasks.add(null);
+            }
+        }
+        return tasks;
     }
 
     // ── lifecycle ────────────────────────────────────────────────────────────
@@ -130,25 +162,32 @@ public class ExecutorTaskManager {
     /**
      * Shuts down the pool and waits up to 30 seconds for all tasks to finish.
      *
-     * TODO: signal the pool to stop accepting new work, then block until all
+     * signal the pool to stop accepting new work, then block until all
      *       in-flight tasks have completed or the timeout expires
      */
     public void shutdown() throws InterruptedException {
-        // TODO: implement
+        pool.close();
+        pool.awaitTermination(30, TimeUnit.SECONDS);
     }
 
     // ── observability ────────────────────────────────────────────────────────
 
     /** Returns a snapshot of the tasks that have completed so far. */
     public List<Task> getCompletedTasks() {
-        // TODO: protect the read with the same lock used in recordCompleted,
+        // protect the read with the same lock used in recordCompleted,
         //       then return a defensive copy so callers cannot mutate internal state
-        return null;
+        completedTasksLock.lock();
+        List<Task> snapshot;
+        try {
+            snapshot = List.copyOf(completedTasks);
+        } finally {
+            completedTasksLock.unlock();
+        }
+        return snapshot;
     }
 
     /** Returns the most recently generated ID (useful for assertions). */
     public int getLastIssuedId() {
-        // TODO: read the current value from the ID counter
-        return 0;
+        return idCounter.intValue();
     }
 }

@@ -57,6 +57,7 @@ public class BatchTaskExecutor {
         //       in-flight tasks have finished before this method returns
         pool.close();
         pool.shutdown();
+        pool.awaitTermination(30, TimeUnit.SECONDS);
     }
 
     /** Total tasks that have completed. */
